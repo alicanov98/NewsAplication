@@ -9,6 +9,8 @@ const darkColors = {
   PrimaryTextColorTransparent: '#E0E0E080',
   SecondaryTextColor: '#A0A0A0',
   TertiaryTextColor: '#6C6C6C',
+  SkletonBgColor: '#1C1C1E',
+  SkletonOverlayColor: '#2C2C2E',
 };
 
 const lightColors = {
@@ -20,6 +22,8 @@ const lightColors = {
   PrimaryTextColorTransparent: '#21212180',
   SecondaryTextColor: '#616161',
   TertiaryTextColor: '#9E9E9E',
+  SkletonBgColor: '#EBEDEE',
+  SkletonOverlayColor: '#FDFBFB',
 };
 
 const GlobalTextStyles = StyleSheet.create({

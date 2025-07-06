@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Image,
   ScrollView,
@@ -23,12 +23,10 @@ const NewsDetailsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'NewsDetailsScreen'>>();
 
-  // Yükləmə vəziyyəti və xəbər detallarını saxlayan state-lər
   const [loading, setLoading] = useState(false);
   const [newsDetails, setNewsDetails] = useState<IArticle | null>(null);
 
-  // Parametrdəki başlıq əsasında xəbər detallarını serverdən yükləyirik
-  const getNewsDetails = async () => {
+  const getNewsDetails = useCallback(async () => {
     setLoading(true);
     try {
       const res = await NewsService.searchNews(params?.title as string);
@@ -38,30 +36,62 @@ const NewsDetailsScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Komponent mount olduqda və ya başlıq dəyişdikdə məlumatları yenidən yüklə
-  useEffect(() => {
-    getNewsDetails();
   }, [params?.title]);
 
-  // Yükləmə davam edirsə, loading komponentini göstər
+  useEffect(() => {
+    if (params?.title) {
+      getNewsDetails();
+    }
+  }, [getNewsDetails, params?.title]);
+
+  const firstLetter = useMemo(() => {
+    return newsDetails?.content?.charAt(0)?.toUpperCase() || '';
+  }, [newsDetails?.content]);
+
+  const formattedDate = useMemo(() => {
+    return newsDetails?.publishedAt
+      ? dayjs(newsDetails.publishedAt).format('DD.MM.YYYY HH:mm')
+      : '';
+  }, [newsDetails?.publishedAt]);
+
   if (loading) {
     return <Loading />;
   }
 
-  // Əsas render: geriyə dönmə düyməsi, skrollanabilən məzmun və stil tərtibatı
+  if (!loading && !newsDetails) {
+    return (
+      <View style={[styles.centered, { backgroundColor: colors.PrimaryColor }]}>
+        <Text style={[textStyles.RegularText, { color: colors.PrimaryTextColor }]}>
+          Xəbər tapılmadı.
+        </Text>
+        <TouchableOpacity onPress={getNewsDetails}>
+          <Text style={{ color: colors.PrimaryTextColor, marginTop: 10 }}>
+            Yenidən cəhd et
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.PrimaryColor }]}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.goBackBtn}>
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={styles.goBackBtn}
+        accessibilityRole="button"
+        accessibilityLabel="Geri dön"
+      >
         <GoBackIcon />
       </TouchableOpacity>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <Text style={[textStyles.LargeText, styles.title]}>{newsDetails?.title}</Text>
 
         <Text style={[textStyles.SmallText, styles.authorDate]}>
-          By {newsDetails?.author || 'Naməlum'} | {dayjs(newsDetails?.publishedAt).format('DD.MM.YYYY HH:mm')}
+          By {newsDetails?.author || 'Naməlum'} | {formattedDate}
         </Text>
 
         {newsDetails?.urlToImage && (
@@ -78,7 +108,7 @@ const NewsDetailsScreen = () => {
 
         <Text style={[textStyles.RegularText, styles.content]}>
           <Text style={[textStyles.RegularText, styles.contentFirstLetter]}>
-            {newsDetails?.content?.charAt(0)?.toUpperCase() || ''}
+            {firstLetter}
           </Text>
           {newsDetails?.content?.slice(1) || ''}
           {newsDetails?.description ? '\n\n' + newsDetails.description : ''}
@@ -125,6 +155,12 @@ const styles = StyleSheet.create({
   contentFirstLetter: {
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
 });
 

@@ -14,14 +14,24 @@ const FavouritesScreen = () => {
   const { colors, textStyles } = useGlobalStyles();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  // FavoritesContext-dən lazım olanları götürürük
   const { favorites, loadFavorites, loading } = useContext(FavoritesContext)!;
 
-  // Fokusda və ya "pull to refresh" zamanı favoritləri yeniləyirik
   useFocusEffect(
     useCallback(() => {
       loadFavorites();
     }, [loadFavorites])
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: IArticle }) => (
+      <NewsCard
+        data={item}
+        onPressCard={() =>
+          navigation.navigate('NewsDetailsScreen', { title: item.title })
+        }
+      />
+    ),
+    [navigation]
   );
 
   if (loading) return <Loading />;
@@ -32,19 +42,14 @@ const FavouritesScreen = () => {
 
       <FlatList
         data={favorites}
-        keyExtractor={item => item.url}
+        keyExtractor={(item, index) => item.url || item.title || index.toString()}
         style={styles.list}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 16 }]}
         refreshing={loading}
         onRefresh={loadFavorites}
-        renderItem={({ item }) => (
-          <NewsCard
-            data={item}
-            onPressCard={() =>
-              navigation.navigate('NewsDetailsScreen', { title: item.title })
-            }
-          />
-        )}
+        renderItem={renderItem}
+        initialNumToRender={5}
+        removeClippedSubviews={true}
       />
     </View>
   );

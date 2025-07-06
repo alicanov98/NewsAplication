@@ -1,95 +1,154 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
   Text,
-  TouchableOpacity,
   View,
   StyleSheet,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import dayjs from 'dayjs';
 
 import { NewsService } from '../Service/NewsService.ts';
 import { IArticle, INewsRequestParams } from '../Types/NewsTypes.ts';
-
 import { RootStackParamList } from '../../../navigation/NewsAppNavigator.tsx';
 import Loading from '../../../components/Loading.tsx';
-import SunIcon from '../../../assets/images/icons/sun.svg';
-import MoonIcon from '../../../assets/images/icons/moon.svg';
-import {
-  AppThemeContext,
-  ThemeModeEnum,
-} from '../../../context/AppThemeContext.tsx';
 import { useGlobalStyles } from '../../../hooks/useGlobalStyles.ts';
-import { FavoritesContext } from '../../../context/FavoritesContext.tsx';
 import { NewsCard } from '../../../components/NewsScreenComponents/NewsCard.tsx';
+import useNetworkStatus from '../../../hooks/useNetworkStatus.ts';
+
+
+const CACHE_KEY = '@cachedNews';
 
 const NewsScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const themeContext = useContext(AppThemeContext);
-  const favoritesContext = useContext(FavoritesContext);
-
-  // Əgər kontekstlər mövcud deyilsə, komponent render etmə
-  if (!themeContext || !favoritesContext) return null;
-
-  const { theme, changeTheme } = themeContext;
-  const { loadFavorites } = favoritesContext;
   const { colors, textStyles } = useGlobalStyles();
+  const isConnected = useNetworkStatus();
 
-  const [loading, setLoading] = useState(false);
   const [news, setNews] = useState<IArticle[]>([]);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [requestParams, setRequestParams] = useState<INewsRequestParams>({
     category: 'technology',
     page: 1,
   });
 
-  // Xəbərləri serverdən gətirir
-  const getNews = useCallback(async () => {
-    setLoading(true);
+  /**
+   * Cache-ə son 5 xəbəri saxla
+   */
+  const saveCache = async (data: IArticle[]) => {
     try {
+      const last5 = data.slice(0, 5);
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(last5));
+    } catch (e) {
+      console.warn('Cache saxlamaq alınmadı:', e);
+    }
+  };
+
+  /**
+   * Cache-dən xəbər yüklə
+   */
+  const loadCache = async () => {
+    try {
+      const cache = await AsyncStorage.getItem(CACHE_KEY);
+      if (cache) {
+        const cachedNews: IArticle[] = JSON.parse(cache);
+        setNews(cachedNews);
+      } else {
+        setNews([]);
+      }
+    } catch (e) {
+      console.warn('Cache yükləmək alınmadı:', e);
+    }
+  };
+
+  /**
+   * Eyni xəbərləri təkrar etməsin deyə
+   */
+  const mergeArticles = (oldList: IArticle[], newList: IArticle[]) => {
+    const map = new Map<string, IArticle>();
+    [...newList, ...oldList].forEach(item => {
+      map.set(item.url, item);
+    });
+    return Array.from(map.values());
+  };
+
+  const getNews = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (!isConnected) {
+        await loadCache();
+
+        setError(
+          news.length === 0
+            ? 'İnternet bağlantısı yoxdur və cache boşdur.'
+            : 'İnternet bağlantısı yoxdur.'
+        );
+
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const res = await NewsService.newsList(requestParams);
+        
       if (requestParams.page === 1) {
         setNews(res);
+        await saveCache(res);
       } else {
-        setNews(prevNews => [...prevNews, ...res]);
+        const merged = mergeArticles(news, res);
+        setNews(merged);
+        await saveCache(merged);
       }
-    } catch (err) {
-      console.error('Xəbərləri yükləyərkən xəta baş verdi:', err);
+
+    } catch (e) {
+      console.error('Xəbərləri yükləmək alınmadı:', e);
+
+      if (!isConnected) {
+        setError('İnternet bağlantısı yoxdur.');
+        await loadCache();
+      } else {
+        setError('Xəbərləri yükləmək alınmadı.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [requestParams]);
+  }, [requestParams, isConnected]);
 
   useEffect(() => {
     getNews();
   }, [getNews]);
 
-  // Ekran fokuslandıqda favoritləri yenilə
-  useFocusEffect(
-    useCallback(() => {
-      loadFavorites();
-    }, [loadFavorites])
-  );
+  /**
+   * İnternet gələndə error silinsin
+   */
+  useEffect(() => {
+    if (isConnected) {
+      setError(null);
+    }
+  }, [isConnected]);
 
   const handleEndReached = () => {
-    if (!loading) {
-      setRequestParams(prev => ({
-        ...prev,
-        page: prev.page + 1,
-      }));
+    if (!loading && isConnected) {
+      setRequestParams(prev => ({ ...prev, page: prev.page + 1 }));
     }
   };
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    setRequestParams({
-      category: 'technology',
-      page: 1,
-    });
+    if (isConnected) {
+      setRefreshing(true);
+      setRequestParams({ category: 'technology', page: 1 });
+    } else {
+      setError('İnternet bağlantısı yoxdur.');
+      loadCache();
+      setRefreshing(false);
+    }
   };
 
   if (loading && requestParams.page === 1) {
@@ -98,25 +157,13 @@ const NewsScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.PrimaryColor }]}>
-      <View style={styles.header}>
-        <Text style={[textStyles.LargeText, styles.title]}>News</Text>
-        <TouchableOpacity
-          onPress={() =>
-            changeTheme(
-              theme === ThemeModeEnum.DARK
-                ? ThemeModeEnum.LIGHT
-                : ThemeModeEnum.DARK
-            )
-          }
-          style={styles.themeToggleBtn}
-        >
-          {theme === ThemeModeEnum.DARK ? (
-            <SunIcon width={36} height={36} />
-          ) : (
-            <MoonIcon width={36} height={36} />
-          )}
-        </TouchableOpacity>
-      </View>
+      <Text style={[textStyles.LargeText, styles.title]}>News</Text>
+
+      {error && (
+        <Text style={[textStyles.SmallText, { color: 'red', marginBottom: 10 }]}>
+          {error}
+        </Text>
+      )}
 
       <FlatList
         data={news}
@@ -140,6 +187,22 @@ const NewsScreen = () => {
             colors={[colors.PrimaryColor]}
           />
         }
+        ListEmptyComponent={
+          !loading ? (
+            <Text
+              style={[
+                textStyles.RegularText,
+                {
+                  textAlign: 'center',
+                  marginTop: 50,
+                  color: colors.PrimaryTextColor,
+                },
+              ]}
+            >
+              Xəbər tapılmadı.
+            </Text>
+          ) : null
+        }
       />
     </View>
   );
@@ -151,16 +214,8 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     paddingHorizontal: 16,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   title: {
     marginBottom: 24,
-  },
-  themeToggleBtn: {
-    width: 36,
-    height: 36,
   },
   list: {
     flex: 1,

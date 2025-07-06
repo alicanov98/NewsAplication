@@ -1,7 +1,6 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo, useCallback } from 'react';
 import { Image, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import dayjs from 'dayjs';
-
 import BookmarkWhiteIcon from '../../assets/images/icons/bookmark-white.svg';
 import BookmarkDarkIcon from '../../assets/images/icons/bookmark-dark.svg';
 import { useGlobalStyles } from '../../hooks/useGlobalStyles.ts';
@@ -14,7 +13,7 @@ interface INewsCard {
   onPressCard: () => void;
 }
 
-export const NewsCard: React.FC<INewsCard> = ({ data, onPressCard }) => {
+export const NewsCard = React.memo(({ data, onPressCard }: INewsCard) => {
   const themeContext = useContext(AppThemeContext);
   const favoritesContext = useContext(FavoritesContext);
 
@@ -26,41 +25,62 @@ export const NewsCard: React.FC<INewsCard> = ({ data, onPressCard }) => {
   const { favorites, toggleFavorite } = favoritesContext;
 
   const isFavorited = favorites.some(fav => fav.url === data.url);
+  const iconFillColor = isFavorited ? colors.PrimaryTextColor : 'none';
 
-  
-  const iconFillColor = isFavorited
-    ? (theme === ThemeModeEnum.DARK ? colors.PrimaryTextColor : colors.PrimaryTextColor)
-    : 'none';
+  const onPressToggleFavorite = useCallback(() => {
+    toggleFavorite(data);
+  }, [toggleFavorite, data]);
+
+  const dynamicStyles = useMemo(() => ({
+    sourceText: { color: colors.Soft },
+    dateText: { color: colors.Soft },
+    titleText: { color: colors.PrimaryTextColor },
+  }), [colors]);
+
+  const formattedDate = useMemo(() => {
+    return dayjs(publishedAt).format('DD.MM.YYYY HH:mm');
+  }, [publishedAt]);
 
   return (
-    <TouchableOpacity onPress={onPressCard} style={styles.container} activeOpacity={0.8}>
-      {urlToImage && (
-        <Image
-          source={{ uri: urlToImage }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      )}
+    <TouchableOpacity
+      onPress={onPressCard}
+      style={styles.container}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`Xəbər kartı: ${title}`}
+    >
+      <Image
+        source={urlToImage ? { uri: urlToImage } : require('../../assets/images/news.webp')}
+        style={styles.image}
+        resizeMode="cover"
+      />
 
       <View style={styles.headerRow}>
-        <Text style={[textStyles.SmallText, styles.sourceText, { color: colors.Soft }]}>
+        <Text style={[textStyles.SmallText, styles.sourceText, dynamicStyles.sourceText]}>
           {source.name}
         </Text>
-        <Text style={[textStyles.SmallText, styles.dateText, { color: colors.Soft }]}>
-          {dayjs(publishedAt).format('DD.MM.YYYY HH:mm')}
+        <Text style={[textStyles.SmallText, styles.dateText, dynamicStyles.dateText]}>
+          {formattedDate}
         </Text>
       </View>
 
       <View style={styles.footerRow}>
         <Text
-          style={[textStyles.RegularText, styles.titleText, { color: colors.PrimaryTextColor }]}
+          style={[textStyles.RegularText, styles.titleText, dynamicStyles.titleText]}
           numberOfLines={2}
           ellipsizeMode="tail"
         >
           {title}
         </Text>
 
-        <TouchableOpacity onPress={() => toggleFavorite(data)} style={styles.bookmarkBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={onPressToggleFavorite}
+          style={styles.bookmarkBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel={isFavorited ? 'Xəbəri favoritdən çıxar' : 'Xəbəri favoritə əlavə et'}
+        >
           {theme === ThemeModeEnum.DARK ? (
             <BookmarkWhiteIcon width={36} height={36} fill={iconFillColor} />
           ) : (
@@ -70,7 +90,7 @@ export const NewsCard: React.FC<INewsCard> = ({ data, onPressCard }) => {
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
