@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
 
 const darkColors = {
+  PureWhite: '#ffffff',
+  PureBlack: '#000000',
   PrimaryColor: '#121212',
   SecondaryColor: '#1E1E1E',
   Soft: '#4CAF50',
@@ -14,6 +16,8 @@ const darkColors = {
 };
 
 const lightColors = {
+  PureWhite: '#ffffff',
+  PureBlack: '#000000',
   PrimaryColor: '#FFFFFF',
   SecondaryColor: '#F5F5F5',
   Soft: '#1E88E5',

@@ -1,4 +1,10 @@
-import React, { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IArticle } from '../Modules/News/Types/NewsTypes.ts';
 
@@ -9,7 +15,9 @@ export interface IFavoritesContext {
   loadFavorites: () => Promise<void>;
 }
 
-export const FavoritesContext = createContext<IFavoritesContext | undefined>(undefined);
+export const FavoritesContext = createContext<IFavoritesContext | undefined>(
+  undefined,
+);
 
 interface FavoritesProviderProps {
   children: ReactNode;
@@ -17,11 +25,12 @@ interface FavoritesProviderProps {
 
 const FAVORITES_KEY = '@favorites_articles';
 
-export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }) => {
+export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({
+  children,
+}) => {
   const [favorites, setFavorites] = useState<IArticle[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // AsyncStorage-dan favoritləri yükləyir
   const loadFavorites = useCallback(async () => {
     setLoading(true);
     try {
@@ -32,13 +41,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
         setFavorites([]);
       }
     } catch (error) {
-      console.error('Favoritləri yükləyərkən xəta:', error);
+      console.log(error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Favorit əlavə/çıxarır və AsyncStorage-a yazır
   const toggleFavorite = async (article: IArticle) => {
     let updatedFavorites: IArticle[];
     if (favorites.some(fav => fav.url === article.url)) {
@@ -47,21 +55,24 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
       updatedFavorites = [...favorites, article];
     }
     setFavorites(updatedFavorites);
-
     try {
-      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updatedFavorites));
+      await AsyncStorage.setItem(
+        FAVORITES_KEY,
+        JSON.stringify(updatedFavorites),
+      );
     } catch (error) {
-      console.error('Favoritləri yadda saxlayarkən xəta:', error);
+      console.log(error);
     }
   };
 
-  // Komponent mount olarkən favoritləri yüklə
   useEffect(() => {
     loadFavorites();
   }, []);
 
   return (
-    <FavoritesContext.Provider value={{ favorites, loading, toggleFavorite, loadFavorites }}>
+    <FavoritesContext.Provider
+      value={{ favorites, loading, toggleFavorite, loadFavorites }}
+    >
       {children}
     </FavoritesContext.Provider>
   );

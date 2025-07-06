@@ -13,7 +13,6 @@ const useNetworkStatus = () => {
       unsubscribe();
     };
   }, []);
-
   return isConnected;
 };
 

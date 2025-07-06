@@ -63,7 +63,8 @@ const BottomTabNavigator = () => {
         headerShown: false,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          backgroundColor: colors.SecondaryColor,
+          backgroundColor: colors.PrimaryColor,
+          borderTopColor: colors.PrimaryTextColorTransparent,
         },
         tabBarActiveTintColor: colors.Soft,
       }}

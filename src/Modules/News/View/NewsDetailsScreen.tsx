@@ -9,19 +9,20 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import dayjs from 'dayjs';
-
 import { RootStackParamList } from '../../../navigation/NewsAppNavigator.tsx';
-import { IArticle } from '../Types/NewsTypes.ts';
-import Loading from '../../../components/Loading.tsx';
-import { NewsService } from '../Service/NewsService.ts';
-import GoBackIcon from '../../../assets/images/icons/go-back.svg';
 import { useGlobalStyles } from '../../../hooks/useGlobalStyles.ts';
+import { NewsService } from '../Service/NewsService.ts';
+import { IArticle } from '../Types/NewsTypes.ts';
+import NewsDetailsSkeleton from './NewsDetailsSkeleton.tsx';
+import GoBackIcon from '../../../assets/images/icons/go-back.svg';
+import dayjs from 'dayjs';
 
 const NewsDetailsScreen = () => {
   const { colors, textStyles } = useGlobalStyles();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { params } = useRoute<RouteProp<RootStackParamList, 'NewsDetailsScreen'>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { params } =
+    useRoute<RouteProp<RootStackParamList, 'NewsDetailsScreen'>>();
 
   const [loading, setLoading] = useState(false);
   const [newsDetails, setNewsDetails] = useState<IArticle | null>(null);
@@ -32,7 +33,7 @@ const NewsDetailsScreen = () => {
       const res = await NewsService.searchNews(params?.title as string);
       setNewsDetails(res);
     } catch (error) {
-      console.error('Xəbər detallarını yükləyərkən xəta baş verdi:', error);
+      console.error('An error occurred while loading news details:', error);
     } finally {
       setLoading(false);
     }
@@ -55,13 +56,15 @@ const NewsDetailsScreen = () => {
   }, [newsDetails?.publishedAt]);
 
   if (loading) {
-    return <Loading />;
+    return <NewsDetailsSkeleton />;
   }
 
-  if (!loading && !newsDetails) {
+  if (loading && !newsDetails) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.PrimaryColor }]}>
-        <Text style={[textStyles.RegularText, { color: colors.PrimaryTextColor }]}>
+        <Text
+          style={[textStyles.RegularText, { color: colors.PrimaryTextColor }]}
+        >
           Xəbər tapılmadı.
         </Text>
         <TouchableOpacity onPress={getNewsDetails}>
@@ -74,24 +77,34 @@ const NewsDetailsScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.PrimaryColor }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.PrimaryColor,
+        },
+      ]}
+    >
       <TouchableOpacity
         onPress={() => navigation.goBack()}
         style={styles.goBackBtn}
         accessibilityRole="button"
-        accessibilityLabel="Geri dön"
+        accessibilityLabel="go back"
       >
         <GoBackIcon />
       </TouchableOpacity>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={[textStyles.LargeText, styles.title]}>{newsDetails?.title}</Text>
+        <Text style={[textStyles.LargeText, styles.title]}>
+          {newsDetails?.title}
+        </Text>
 
         <Text style={[textStyles.SmallText, styles.authorDate]}>
-          By {newsDetails?.author || 'Naməlum'} | {formattedDate}
+          By {newsDetails?.author || 'Unknown'} | {formattedDate}
         </Text>
 
         {newsDetails?.urlToImage && (
@@ -102,7 +115,9 @@ const NewsDetailsScreen = () => {
           />
         )}
 
-        <Text style={[textStyles.SmallText, styles.source, { color: colors.Soft }]}>
+        <Text
+          style={[textStyles.SmallText, styles.source, { color: colors.Soft }]}
+        >
           {newsDetails?.source?.name}
         </Text>
 
@@ -121,10 +136,11 @@ const NewsDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingVertical: 22,
     paddingHorizontal: 16,
+    paddingVertical: 22,
   },
   goBackBtn: {
+    width: 35,
     marginBottom: 16,
   },
   scrollView: {

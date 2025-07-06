@@ -2,75 +2,72 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
+  StyleSheet,
   Text,
   View,
-  StyleSheet,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-import { NewsService } from '../Service/NewsService.ts';
 import { IArticle, INewsRequestParams } from '../Types/NewsTypes.ts';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/NewsAppNavigator.tsx';
-import Loading from '../../../components/Loading.tsx';
 import { useGlobalStyles } from '../../../hooks/useGlobalStyles.ts';
-import { NewsCard } from '../../../components/NewsScreenComponents/NewsCard.tsx';
+import { useNavigation } from '@react-navigation/native';
+import { NewsService } from '../Service/NewsService.ts';
+import NewsScreenSkeleton from './NewsScreenSkeleton.tsx';
 import useNetworkStatus from '../../../hooks/useNetworkStatus.ts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import PagesHeader from '../../../components/PagesHeader.tsx';
+import NewsCard from './NewsCard.tsx';
+
 
 
 const CACHE_KEY = '@cachedNews';
 
 const NewsScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, textStyles } = useGlobalStyles();
   const isConnected = useNetworkStatus();
-
   const [news, setNews] = useState<IArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [requestParams, setRequestParams] = useState<INewsRequestParams>({
     category: 'technology',
     page: 1,
   });
 
-  /**
-   * Cache-ə son 5 xəbəri saxla
-   */
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const cache = await AsyncStorage.getItem(CACHE_KEY);
+        if (cache) {
+          const cachedNews: IArticle[] = JSON.parse(cache);
+          setNews(cachedNews);
+        }
+      } catch (err) {
+        console.log('Error loading cache:', err);
+      } finally {
+        if (isConnected) {
+          setRefreshing(true);
+          setRequestParams({ category: 'technology', page: 1 });
+        }
+      }
+    };
+    init();
+  }, []);
+
   const saveCache = async (data: IArticle[]) => {
     try {
       const last5 = data.slice(0, 5);
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(last5));
-    } catch (e) {
-      console.warn('Cache saxlamaq alınmadı:', e);
+    } catch (err) {
+      console.log('Error saving cache:', err);
     }
   };
 
-  /**
-   * Cache-dən xəbər yüklə
-   */
-  const loadCache = async () => {
-    try {
-      const cache = await AsyncStorage.getItem(CACHE_KEY);
-      if (cache) {
-        const cachedNews: IArticle[] = JSON.parse(cache);
-        setNews(cachedNews);
-      } else {
-        setNews([]);
-      }
-    } catch (e) {
-      console.warn('Cache yükləmək alınmadı:', e);
-    }
-  };
-
-  /**
-   * Eyni xəbərləri təkrar etməsin deyə
-   */
   const mergeArticles = (oldList: IArticle[], newList: IArticle[]) => {
     const map = new Map<string, IArticle>();
-    [...newList, ...oldList].forEach(item => {
+    [...oldList, ...newList].forEach(item => {
       map.set(item.url, item);
     });
     return Array.from(map.values());
@@ -79,24 +76,18 @@ const NewsScreen = () => {
   const getNews = useCallback(async () => {
     setError(null);
     setLoading(true);
-
     try {
       if (!isConnected) {
-        await loadCache();
-
         setError(
           news.length === 0
-            ? 'İnternet bağlantısı yoxdur və cache boşdur.'
-            : 'İnternet bağlantısı yoxdur.'
+            ? 'No internet connection found. Offline mode active'
+            : 'No internet connection found.',
         );
-
         setLoading(false);
         setRefreshing(false);
         return;
       }
-
       const res = await NewsService.newsList(requestParams);
-        
       if (requestParams.page === 1) {
         setNews(res);
         await saveCache(res);
@@ -105,16 +96,8 @@ const NewsScreen = () => {
         setNews(merged);
         await saveCache(merged);
       }
-
-    } catch (e) {
-      console.error('Xəbərləri yükləmək alınmadı:', e);
-
-      if (!isConnected) {
-        setError('İnternet bağlantısı yoxdur.');
-        await loadCache();
-      } else {
-        setError('Xəbərləri yükləmək alınmadı.');
-      }
+    } catch (err) {
+      console.log('Fetch error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -123,20 +106,19 @@ const NewsScreen = () => {
 
   useEffect(() => {
     getNews();
-  }, [getNews]);
+  }, [requestParams]);
 
-  /**
-   * İnternet gələndə error silinsin
-   */
   useEffect(() => {
     if (isConnected) {
-      setError(null);
+      setRequestParams(prev => ({ ...prev, page: prev.page + 1 }));
     }
   }, [isConnected]);
 
   const handleEndReached = () => {
-    if (!loading && isConnected) {
-      setRequestParams(prev => ({ ...prev, page: prev.page + 1 }));
+    if (!loading) {
+      if (isConnected) {
+        setRequestParams(prev => ({ ...prev, page: prev.page + 1 }));
+      }
     }
   };
 
@@ -145,35 +127,43 @@ const NewsScreen = () => {
       setRefreshing(true);
       setRequestParams({ category: 'technology', page: 1 });
     } else {
-      setError('İnternet bağlantısı yoxdur.');
-      loadCache();
-      setRefreshing(false);
+      setError('No internet connection found.');
     }
   };
 
   if (loading && requestParams.page === 1) {
-    return <Loading />;
+    return <NewsScreenSkeleton />;
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.PrimaryColor }]}>
-      <Text style={[textStyles.LargeText, styles.title]}>News</Text>
-
+    <View
+      style={[styles.container, { backgroundColor: colors.PrimaryColor }]}
+    >
+      <PagesHeader title={'News'} />
       {error && (
-        <Text style={[textStyles.SmallText, { color: 'red', marginBottom: 10 }]}>
+        <Text
+          style={[textStyles.SmallText, { color: 'red', marginBottom: 10 }]}
+        >
           {error}
         </Text>
       )}
-
       <FlatList
         data={news}
         keyExtractor={item => item.url}
+        showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <NewsCard
             data={item}
-            onPressCard={() =>
-              navigation.navigate('NewsDetailsScreen', { title: item.title })
-            }
+            disabled={!isConnected}
+            onPressCard={() => {
+              if (isConnected) {
+                navigation.navigate('NewsDetailsScreen', {
+                  title: item.title,
+                });
+              } else {
+                setError('No internet connection found. Please reconnect');
+              }
+            }}
           />
         )}
         style={styles.list}
@@ -199,7 +189,7 @@ const NewsScreen = () => {
                 },
               ]}
             >
-              Xəbər tapılmadı.
+              No news found !
             </Text>
           ) : null
         }
@@ -213,9 +203,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 22,
     paddingHorizontal: 16,
-  },
-  title: {
-    marginBottom: 24,
   },
   list: {
     flex: 1,

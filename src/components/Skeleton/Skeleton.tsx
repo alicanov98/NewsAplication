@@ -1,6 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {StyleSheet, Animated, View, ViewStyle, StyleProp} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useGlobalStyles } from '../../hooks/useGlobalStyles';
 
 interface SkeletonProps {
   width?: number | string;
@@ -14,7 +15,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
   style,
 }) => {
   const numericWidth = typeof width === 'number' ? width : 300;
-
+ const { colors } = useGlobalStyles()
   const translateX = useRef(new Animated.Value(-numericWidth)).current;
 
   useEffect(() => {
@@ -34,7 +35,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
           {
             width: width,
             height: height,
-            backgroundColor: '#EBEDEE',
+            backgroundColor: colors.SkletonBgColor,
             overflow: 'hidden',
           },
           style,
@@ -47,7 +48,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
           transform: [{translateX: translateX}],
         }}>
         <LinearGradient
-          colors={['#FDFBFB', '#EBEDEE']}
+          colors={[colors.SkletonOverlayColor, colors.SkletonBgColor]}
           style={{
             width: '100%',
             height: '100%',
